@@ -21,3 +21,7 @@ The tunes contain:
 	- The speed that you capture the point with (stacks up to 3 times depending on the amount of tees standing on the point)
 - capture_rotate (default 0.1)
 	- The rotation speed of the capture point. Purely visual.
+
+Mapping
+------
+The rule is simple. You place flag -> you placed capture point. Both flags do the exact same thing.
