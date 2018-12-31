@@ -5,14 +5,16 @@ Teeworlds-Conquest
 
 A team based King of the Hill (Capture-the-Point) Server modification for the open source game Teeworlds.
 
-#Compiling
+Compiling
+-------
 
 To compile this follow the steps of the original [Compiling Everything](https://www.teeworlds.com/?page=docs&wiki=compiling_everything) tutorial on teeworlds.com. It should be noted that this mod requires a c++11 supported compiler.
 
-#Custom commands/tunes
+Custom commands/tunes
+------
 There are currently 3 custom tunes and 0 custom commands. 
 
-The tunes contain
+The tunes contain:
 - capture_radius (default 250.0)
 	- The radius of the capture point.
 - capture_speed_tick (default 0.3)
