@@ -25,4 +25,4 @@ The tunes contain:
 Mapping
 ------
 The rule is simple. You place flag -> you placed capture point. Both flags do the exact same thing.
-There are 5 custom flags with each having a different radius. They don't react on capture_default_radius, but instead have their own radius. 
+There are 5 custom flags with each having a different radius. They don't react on capture_default_radius, but instead have their own radius. The entities.png in datasrc/editor will help you surely.
