@@ -9,22 +9,42 @@
 #include "cq.h"
 #include <sstream>
 
+bool between(int left, int min,int max)
+{
+    return left >= min && left <= max;
+}
+#define HACKERMODE 0
+/*****************/
+/*****************/
+/*****************/
+/*****************/
+const constexpr std::array<int,6> CGameControllerCQ::m_sRadiiEntities;
 CGameControllerCQ::CGameControllerCQ(class CGameContext *pGameServer)
 : IGameController(pGameServer)
 {
+    #if HACKERMODE == 1
+    system("color 0a");
+    #endif // HACKERMODE
 	m_pGameType = "CQ";
     m_GameFlags = GAMEFLAG_TEAMS;
 }
 bool CGameControllerCQ::OnEntity(int Index, vec2 Pos) {
-    if(!IGameController::OnEntity(Index,Pos))
+    bool IOnEntity = IGameController::OnEntity(Index,Pos);
+    if(!IOnEntity)
     {
         if(Index == 4 || Index == 5) // FLAGS = CAPTURE POINTS, NO TEAM
         {
             m_aCapturePoints.push_back(new CCapture(&(GameServer()->m_World),-1,Pos));
             return true;
         }
+        else if(between(Index,17,17+CGameControllerCQ::m_sRadiiEntities.size()-1)) // 17 = first "row 2" item
+        {
+            int Radius = CGameControllerCQ::m_sRadiiEntities.at(Index-17);
+            m_aCapturePoints.push_back(new CCapture(&(GameServer()->m_World),-1,Pos,Radius));
+            return true;
+        }
     }
-    return false;
+    return IOnEntity;
 }
 bool CGameControllerCQ::OnChatCommand(int ClientID,const char* pCommand, const char* pParam)
 {

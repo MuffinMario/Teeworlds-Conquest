@@ -16,18 +16,20 @@ private:
 	double m_BelongingPercent[2];
 	/* Current Degree of the Circle around the CP */
 	double m_RotateCircleDegree = 0.0;
-	static const size_t m_sDots;
+	size_t m_sDots = 10;
 	/* Circle */
 	std::vector<CLaserDot*> m_aDotsRed;
 	std::vector<CLaserDot*> m_aDotsBlue;
     /* Contester */
     //TODO: CLaserDot* m_aContestingPoints[2][3];
+    int m_CaptureRadius;
 
 	unsigned m_TickLeftPoint;
 
 public:
 
 	/* Constructor */
+	CCapture(CGameWorld *pGameWorld, int Team, vec2 StandPos,int CaptureRadius);
 	CCapture(CGameWorld *pGameWorld, int Team, vec2 StandPos);
 
 	/* Initiate the Dots */

@@ -6,8 +6,9 @@
 #include <../../../base/vmath.h>
 #include <game/server/entities/capture.h>
 #include <vector>
+#include <array>
 
-#define CQ_VERSION "0.1.0"
+#define CQ_VERSION "0.2.0"
 
 // you can subclass GAMECONTROLLER_CTF, GAMECONTROLLER_TDM etc if you want
 // todo a modification with their base as well.
@@ -15,6 +16,10 @@ class CGameControllerCQ : public IGameController
 {
     std::vector<CCapture*> m_aCapturePoints;
 public:
+    static const constexpr std::array<int,6> m_sRadiiEntities = {
+        100,150,200,250,350,450
+    };
+
 	CGameControllerCQ(class CGameContext *pGameServer);
 	virtual void Tick();
 	virtual bool OnChatCommand(int ClientID,const char* pCommand,const char* pParam);

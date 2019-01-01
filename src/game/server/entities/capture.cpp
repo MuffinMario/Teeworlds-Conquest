@@ -7,16 +7,33 @@
 #include <base/math.h>
 #include <string>
 #include <iostream>
+#include <sstream>
 #include "capture.h"
 
-const size_t CCapture::m_sDots = 20;
+//const size_t CCapture::m_sDots = 10;
 CCapture::CCapture(CGameWorld *pGameWorld, int Team, vec2 StandPos)
 : CEntity(pGameWorld, CGameWorld::ENTTYPE_FLAG, StandPos)
 {
     m_Team = Team;
     m_StandPos = StandPos;
 
+    m_CaptureRadius = GameServer()->Tuning()->m_CaptureDefaultRadius;
     GameServer()->m_World.InsertEntity(this);
+    m_sDots = std::max((int)((m_CaptureRadius/250.0) * 25),3); // you cant make a circle without 3 dots, dummy
+
+    Init();
+}
+
+CCapture::CCapture(CGameWorld *pGameWorld, int Team, vec2 StandPos,int CaptureRadius)
+: CEntity(pGameWorld, CGameWorld::ENTTYPE_FLAG, StandPos)
+{
+    m_Team = Team;
+    m_StandPos = StandPos;
+
+
+    m_CaptureRadius = CaptureRadius;
+    GameServer()->m_World.InsertEntity(this);
+    m_sDots = std::max((int)((m_CaptureRadius/250.0) * 25),3); // you cant make a circle without 3 dots, dummy
 
     Init();
 }
@@ -26,7 +43,7 @@ void CCapture::UpdateCapturePointOwnage()
     const double DPD = 360.0 / m_sDots; // DEGREE PER DOT
     double MaxPercentPerDot = 1.0/m_sDots;
     double Percent = m_BelongingPercent[0] + MaxPercentPerDot;
-    double CaptureRadius = GameServer()->Tuning()->m_CaptureRadius;
+    double CaptureRadius = m_CaptureRadius;
     /* Red capture poitns */
     for(auto& pLaserDot : m_aDotsRed)
     {
@@ -34,6 +51,7 @@ void CCapture::UpdateCapturePointOwnage()
         double DotPercent =  clamp(min(Percent,MaxPercentPerDot),0.0,1.0);
         double Degree = m_RotateCircleDegree + DPD*i/180.0*M_PI;
         double DegreeFrom = Degree + (360.0*DotPercent)/180.0*M_PI;
+
         vec2 NewLaserPos(m_StandPos);
         vec2 NewLaserFromPos(m_StandPos);
 
@@ -48,13 +66,14 @@ void CCapture::UpdateCapturePointOwnage()
     /* Blue capture points */
     i = 0;
     Percent = m_BelongingPercent[1] + MaxPercentPerDot;
-    CaptureRadius = GameServer()->Tuning()->m_CaptureRadius + 20; // 20 units more radius for team blue
+    CaptureRadius = m_CaptureRadius + 20; // 20 units more radius for team blue
     for(auto& pLaserDot : m_aDotsBlue)
     {
         Percent -= MaxPercentPerDot;
         double DotPercent =  clamp(min(Percent,MaxPercentPerDot),0.0,1.0);
         double Degree = m_RotateCircleDegree + DPD*i/180.0*M_PI;
         double DegreeFrom = Degree + (360.0*DotPercent)/180.0*M_PI;
+
         vec2 NewLaserPos(m_StandPos);
         vec2 NewLaserFromPos(m_StandPos);
 
@@ -81,7 +100,7 @@ void CCapture::Init()
 
         double Degree = m_RotateCircleDegree + DPD*i/180.0*M_PI;
         double DegreeFrom = Degree + 360.0*DotPercent;
-        double CaptureRadius = GameServer()->Tuning()->m_CaptureRadius;
+        double CaptureRadius = GameServer()->Tuning()->m_CaptureDefaultRadius;
         vec2 LaserPos(m_StandPos);
         vec2 LaserFromPos(m_StandPos);
 
@@ -104,7 +123,7 @@ void CCapture::Init()
 
         double Degree = m_RotateCircleDegree + DPD*i/180.0*M_PI;
         double DegreeFrom = Degree + 360.0*DotPercent;
-        double CaptureRadius = GameServer()->Tuning()->m_CaptureRadius + 20;
+        double CaptureRadius = m_CaptureRadius + 20;
         vec2 LaserPos(m_StandPos);
         vec2 LaserFromPos(m_StandPos);
 
@@ -170,7 +189,7 @@ void CCapture::Tick()
                 const vec2& PlayerPos = pPlayer->GetCharacter()->GetPos();
                 vec2 StandPos = m_StandPos;
                 float Dist = std::sqrt((PlayerPos.x - StandPos.x) * (PlayerPos.x - StandPos.x) + (PlayerPos.y - StandPos.y) *(PlayerPos.y - StandPos.y)) ;
-                if(Dist < GameServer()->Tuning()->m_CaptureRadius)
+                if(Dist < m_CaptureRadius)
                 {
                     int Team = pPlayer->GetTeam();
                     m_PlayersOn[Team] = m_PlayersOn[Team] + 1;
@@ -199,14 +218,18 @@ void CCapture::Tick()
               m_BelongingPercent[~ContestingTeam&1] = clamp(m_BelongingPercent[~ContestingTeam&1],0.0,1.0);
               if(m_BelongingPercent[ContestingTeam] == 1 && m_BelongingPercent[~ContestingTeam&1] == 0) // if they are not logically inverse this algorithm would be flawed
               {
-                  std::cout << "new flag owner team " << ContestingTeam << std::endl;
-                  std::string message = "Team ";
+                 // update captured belonging team
                   m_Team = ContestingTeam;
-                  message += m_Team==TEAM_RED?"red":"blue";
-                  message += " captured a point";
 
-                  GameServer()->SendChat(-1,CHAT_ALL,-1,message.c_str());
-                  //simulate SOUND
+                  std::stringstream ss;
+                  ss << "team '" << (m_Team==TEAM_RED?"red":"blue") << "' captured point with eid " << GetID();
+                  GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", ss.str().c_str());
+
+                  ss = std::stringstream();// reset to another ss
+                  ss << "Team " << (m_Team==TEAM_RED?"red":"blue") << " captured a point!";
+                  GameServer()->SendBroadcast(ss.str().c_str(),-1);
+                  //GameServer()->SendChat(-1,CHAT_ALL,-1,ss.str().c_str());
+                  //simulate SOUND, i feel like this shouldnt be the only way to do this.
                   for(int i = 0; i < MAX_CLIENTS;i++)
                   {
                       CPlayer* pPlayer = GameServer()->m_apPlayers[i];
@@ -231,7 +254,6 @@ void CCapture::Tick()
                 if(m_BelongingPercent[m_Team] != 1.0 || m_BelongingPercent[EnemyTeam] != 0.0)
                 {
                     double CaptureSpeed = GameServer()->Tuning()->m_CaptureSpeedPerTick/10 * m_PlayersOn[ContestingTeam];
-                    int EnemyTeam = ~m_Team&1;
                     GameServer()->CreateSound(m_StandPos,SOUND_PLAYER_JUMP,CmaskAll());
                     if(m_BelongingPercent[m_Team] != 1.0)
                         m_BelongingPercent[m_Team] = clamp(m_BelongingPercent[m_Team] + CaptureSpeed,0.0,1.0);
@@ -254,6 +276,7 @@ void CCapture::Tick()
         {
             if(m_BelongingPercent[TEAM_RED] != 1.0 && m_BelongingPercent[TEAM_BLUE] != 0.0)
             {
+                /* REGAIN RED (SPEED 1/75 th)*/
                 GameServer()->CreateSound(m_StandPos,SOUND_PLAYER_JUMP,CmaskAll());
                 if(m_BelongingPercent[TEAM_RED] != 1.0)
                     m_BelongingPercent[TEAM_RED] = clamp(m_BelongingPercent[TEAM_RED] + GameServer()->Tuning()->m_CaptureSpeedPerTick/75.0,0.0,1.0);
@@ -265,11 +288,25 @@ void CCapture::Tick()
         {
             if(m_BelongingPercent[TEAM_BLUE] != 1.0 && m_BelongingPercent[TEAM_RED] != 0.0)
             {
+                /* REGAIN BLUE (SPEED 1/75 th)*/
                 GameServer()->CreateSound(m_StandPos,SOUND_PLAYER_JUMP,CmaskAll());
             if(m_BelongingPercent[TEAM_RED] != 0.0)
                 m_BelongingPercent[TEAM_RED] = clamp(m_BelongingPercent[TEAM_RED] - GameServer()->Tuning()->m_CaptureSpeedPerTick/75.0,0.0,1.0);
             if(m_BelongingPercent[TEAM_BLUE] != 1.0)
                 m_BelongingPercent[TEAM_BLUE] = clamp(m_BelongingPercent[TEAM_BLUE] + GameServer()->Tuning()->m_CaptureSpeedPerTick/75.0,0.0,1.0);
+            }
+        }
+        else
+        {
+            if(m_BelongingPercent[TEAM_BLUE] != 0.0 ||
+                m_BelongingPercent[TEAM_RED] != 0.0)
+            {
+                /* DECREASE BOTH (SPEED 1/30 th)*/
+                GameServer()->CreateSound(m_StandPos,SOUND_PLAYER_JUMP,CmaskAll());
+                if(m_BelongingPercent[TEAM_RED] != 0.0)
+                    m_BelongingPercent[TEAM_RED] = clamp(m_BelongingPercent[TEAM_RED] - GameServer()->Tuning()->m_CaptureSpeedPerTick/30.0,0.0,1.0);
+                if(m_BelongingPercent[TEAM_BLUE] != 0.0)
+                    m_BelongingPercent[TEAM_BLUE] = clamp(m_BelongingPercent[TEAM_BLUE] - GameServer()->Tuning()->m_CaptureSpeedPerTick/30.0,0.0,1.0);
             }
         }
     }

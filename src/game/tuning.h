@@ -45,7 +45,7 @@ MACRO_TUNING_PARAM(LaserBounceCost, laser_bounce_cost, 0)
 MACRO_TUNING_PARAM(PlayerCollision, player_collision, 1)
 MACRO_TUNING_PARAM(PlayerHooking, player_hooking, 1)
 // CQ
-MACRO_TUNING_PARAM(CaptureRadius, capture_radius, 250.0f)
+MACRO_TUNING_PARAM(CaptureDefaultRadius, capture_default_radius, 250.0f)
 MACRO_TUNING_PARAM(CaptureSpeedPerTick, capture_speed_tick, 0.3f)
 MACRO_TUNING_PARAM(CaptureRotateSpeed, capture_rotate, 0.1f)
 #endif
