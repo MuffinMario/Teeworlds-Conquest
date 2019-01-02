@@ -12,8 +12,11 @@ To compile this follow the steps of the original [Compiling Everything](https://
 
 Custom commands/tunes
 ------
-There are currently 3 custom tunes and 0 custom commands. 
-
+There are currently 3 custom tunes and 1 custom commands. 
+The commands contain:
+- sv_respawn_delay_cq (default 2)
+	-The time it takes until a tee can respawn.
+	
 The tunes contain:
 - capture_default_radius (default 250.0)
 	- The radius of the default capture point entities.
