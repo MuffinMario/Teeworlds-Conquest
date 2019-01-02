@@ -15,8 +15,8 @@ Custom commands/tunes
 There are currently 3 custom tunes and 0 custom commands. 
 
 The tunes contain:
-- capture_radius (default 250.0)
-	- The radius of the capture point.
+- capture_default_radius (default 250.0)
+	- The radius of the default capture point entities.
 - capture_speed_tick (default 0.3)
 	- The speed that you capture the point with (stacks up to 3 times depending on the amount of tees standing on the point)
 - capture_rotate (default 0.1)
@@ -25,3 +25,4 @@ The tunes contain:
 Mapping
 ------
 The rule is simple. You place flag -> you placed capture point. Both flags do the exact same thing.
+There are 5 custom flags with each having a different radius. They don't react on capture_default_radius, but instead have their own radius. The entities.png in datasrc/editor will help you surely.
