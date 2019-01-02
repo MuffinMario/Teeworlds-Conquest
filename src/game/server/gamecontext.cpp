@@ -17,6 +17,8 @@
 #include "gamemodes/lms.h"
 #include "gamemodes/lts.h"
 #include "gamemodes/cq.h"
+#include "gamemodes/gcq.h"
+#include "gamemodes/icq.h"
 #include "gamemodes/tdm.h"
 #include "gamecontext.h"
 #include "player.h"
@@ -120,7 +122,95 @@ void CGameContext::CreateHammerHit(vec2 Pos)
 	}
 }
 
+/* Unused and instead DEATH */
+void CGameContext::CreateForceExplosion(vec2 Pos, int Owner, int Weapon)
+{
+	// create the event
+	CNetEvent_Explosion *pEvent = (CNetEvent_Explosion *)m_Events.Create(NETEVENTTYPE_EXPLOSION, sizeof(CNetEvent_Explosion));
+	if(pEvent)
+	{
+		pEvent->m_X = (int)Pos.x;
+		pEvent->m_Y = (int)Pos.y;
+	}
 
+	// deal damage
+	CCharacter *apEnts[MAX_CLIENTS];
+	float Radius = g_pData->m_Explosion.m_Radius;
+	float InnerRadius = 48.0f;
+	float MaxForce = g_pData->m_Explosion.m_MaxForce;
+	int Num = m_World.FindEntities(Pos, Radius, (CEntity**)apEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+	for(int i = 0; i < Num; i++)
+	{
+		vec2 Diff = apEnts[i]->GetPos() - Pos;
+		vec2 Force(0, MaxForce);
+		float l = length(Diff);
+		if(l)
+			Force = normalize(Diff) * MaxForce;
+		float Factor = 1 - clamp((l-InnerRadius)/(Radius-InnerRadius), 0.0f, 1.0f);
+		if((int)(Factor))
+			apEnts[i]->PutForce(Force * Factor);
+	}
+}
+
+void CGameContext::CreateDEATHExplosion(vec2 Pos, int Owner, int Weapon, int MaxDamage)
+{
+	// create the event
+	CNetEvent_Explosion *pEvent = (CNetEvent_Explosion *)m_Events.Create(NETEVENTTYPE_EXPLOSION, sizeof(CNetEvent_Explosion));
+	if(pEvent)
+	{
+		pEvent->m_X = (int)Pos.x;
+		pEvent->m_Y = (int)Pos.y;
+	}
+
+	// deal damage
+	CCharacter *apEnts[MAX_CLIENTS];
+	float Radius = g_pData->m_Explosion.m_Radius;
+	float InnerRadius = 48.0f;
+	float MaxForce = g_pData->m_Explosion.m_MaxForce;
+	int Num = m_World.FindEntities(Pos, Radius, (CEntity**)apEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+	for(int i = 0; i < Num; i++)
+	{
+		vec2 Diff = apEnts[i]->GetPos() - Pos;
+		vec2 Force(0, MaxForce);
+		float l = length(Diff);
+		if(l)
+			Force = normalize(Diff) * MaxForce;
+		float Factor = 1 - clamp((l-InnerRadius)/(Radius-InnerRadius), 0.0f, 1.0f);
+		if((int)(Factor * MaxDamage))
+        {
+            if(Owner != apEnts[i]->GetPlayer()->GetCID()&& m_apPlayers[Owner])
+            {
+                /* Teamkills on setting, enemy death always */
+                 if((g_Config.m_SvTeamdamage &&
+                            m_apPlayers[Owner]->GetTeam() == apEnts[i]->GetPlayer()->GetTeam()) ||
+                        apEnts[i]->GetPlayer()->GetTeam() != m_apPlayers[Owner]->GetTeam()
+                    )
+                 {
+                    apEnts[i]->Die(Owner,WEAPON_GRENADE);
+                    int64 Mask = CmaskOne(Owner);
+                    /* Include spectators following the m_Owner to hear the hit sound too */
+                    for(int i = 0; i < MAX_CLIENTS; i++)
+                    {
+                        if(m_apPlayers[i] && (m_apPlayers[i]->GetTeam() == TEAM_SPECTATORS ||  m_apPlayers[i]->m_DeadSpecMode) &&
+                            m_apPlayers[i]->GetSpectatorID() == Owner)
+                            Mask |= CmaskOne(i);
+                    }
+                    CreateSound(m_apPlayers[Owner]->m_ViewPos, SOUND_HIT, Mask);
+
+                 }
+                 else
+                 {
+                     /* TakeDamage has internal team check but this is faster */
+                     apEnts[i]->PutForce(Force);
+                 }
+            }
+            else
+                // no damage taken
+                apEnts[i]->PutForce(Force*Factor);
+                //apEnts[i]->TakeDamage(Force * Factor, Diff*-1, (int)(Factor * MaxDamage), Owner, Weapon);
+        }
+	}
+}
 void CGameContext::CreateExplosion(vec2 Pos, int Owner, int Weapon, int MaxDamage)
 {
 	// create the event
@@ -1490,6 +1580,10 @@ void CGameContext::OnInit()
 	// select gametype
 	if(str_comp_nocase(g_Config.m_SvGametype, "cq") == 0)
 		m_pController = new CGameControllerCQ(this);
+	else if(str_comp_nocase(g_Config.m_SvGametype, "gcq") == 0)
+		m_pController = new CGameControllerGCQ(this);
+	else if(str_comp_nocase(g_Config.m_SvGametype, "icq") == 0)
+		m_pController = new CGameControllerICQ(this);
 	else if(str_comp_nocase(g_Config.m_SvGametype, "ctf") == 0)
 		m_pController = new CGameControllerCTF(this);
 	else if(str_comp_nocase(g_Config.m_SvGametype, "lms") == 0)

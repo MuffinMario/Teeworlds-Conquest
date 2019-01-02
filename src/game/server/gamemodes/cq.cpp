@@ -6,6 +6,7 @@
 #include <game/version.h>
 #include <game/server/gamecontext.h>
 #include <game/server/entities/character.h>
+#include <game/server/player.h>
 #include "cq.h"
 #include <sstream>
 
@@ -28,21 +29,31 @@ CGameControllerCQ::CGameControllerCQ(class CGameContext *pGameServer)
 	m_pGameType = "CQ";
     m_GameFlags = GAMEFLAG_TEAMS;
 }
+int CGameControllerCQ::OnCharacterDeath(CCharacter* pVictim,CPlayer* pKiller, int Weapon) {
+    IGameController::OnCharacterDeath(pVictim,pKiller,Weapon);
+	pVictim->GetPlayer()->m_RespawnTick = max(pVictim->GetPlayer()->m_RespawnTick, Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvRespawnDelayCQ);
+	return 0;
+}
+bool CGameControllerCQ::OnEntityCQ(int Index, vec2 Pos) {
+
+    if(Index == 4 || Index == 5) // FLAGS = CAPTURE POINTS, NO TEAM
+    {
+        m_aCapturePoints.push_back(new CCapture(&(GameServer()->m_World),-1,Pos));
+        return true;
+    }
+    else if(between(Index,17,17+CGameControllerCQ::m_sRadiiEntities.size()-1)) // 17 = first "row 2" item
+    {
+        int Radius = CGameControllerCQ::m_sRadiiEntities.at(Index-17);
+        m_aCapturePoints.push_back(new CCapture(&(GameServer()->m_World),-1,Pos,Radius));
+        return true;
+    }
+    return false;
+}
 bool CGameControllerCQ::OnEntity(int Index, vec2 Pos) {
     bool IOnEntity = IGameController::OnEntity(Index,Pos);
     if(!IOnEntity)
     {
-        if(Index == 4 || Index == 5) // FLAGS = CAPTURE POINTS, NO TEAM
-        {
-            m_aCapturePoints.push_back(new CCapture(&(GameServer()->m_World),-1,Pos));
-            return true;
-        }
-        else if(between(Index,17,17+CGameControllerCQ::m_sRadiiEntities.size()-1)) // 17 = first "row 2" item
-        {
-            int Radius = CGameControllerCQ::m_sRadiiEntities.at(Index-17);
-            m_aCapturePoints.push_back(new CCapture(&(GameServer()->m_World),-1,Pos,Radius));
-            return true;
-        }
+        OnEntityCQ(Index,Pos);
     }
     return IOnEntity;
 }

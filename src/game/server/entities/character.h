@@ -43,12 +43,14 @@ public:
 
 	void Die(int Killer, int Weapon);
 	bool TakeDamage(vec2 Force, vec2 Source, int Dmg, int From, int Weapon);
+	void PutForce(vec2 Force);
 
 	bool Spawn(class CPlayer *pPlayer, vec2 Pos);
 	bool Remove();
 
 	bool IncreaseHealth(int Amount);
 	bool IncreaseArmor(int Amount);
+	bool IncreaseAmmo(int Weapon,int Amount);
 
 	bool GiveWeapon(int Weapon, int Ammo);
 	void GiveNinja();

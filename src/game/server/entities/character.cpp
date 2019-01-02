@@ -9,7 +9,9 @@
 
 #include "character.h"
 #include "laser.h"
+#include "laser_instagib.h"
 #include "projectile.h"
+#include "projectile_gcq.h"
 
 //input count
 struct CInputCount
@@ -59,7 +61,12 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 	m_EmoteStop = -1;
 	m_LastAction = -1;
 	m_LastNoAmmoSound = -1;
-	m_ActiveWeapon = WEAPON_GUN;
+	if(strcmp(GameServer()->GameType(),"iCQ") == 0)
+        m_ActiveWeapon = WEAPON_LASER;
+	else if(strcmp(GameServer()->GameType(),"gCQ") == 0)
+        m_ActiveWeapon = WEAPON_GRENADE;
+	else
+        m_ActiveWeapon = WEAPON_GUN;
 	m_LastWeapon = WEAPON_HAMMER;
 	m_QueuedWeapon = -1;
 
@@ -367,22 +374,31 @@ void CCharacter::FireWeapon()
 
 		case WEAPON_GRENADE:
 		{
-			new CProjectile(GameWorld(), WEAPON_GRENADE,
-				m_pPlayer->GetCID(),
-				ProjStartPos,
-				Direction,
-				(int)(Server()->TickSpeed()*GameServer()->Tuning()->m_GrenadeLifetime),
-				g_pData->m_Weapons.m_Grenade.m_pBase->m_Damage, true, 0, SOUND_GRENADE_EXPLODE, WEAPON_GRENADE);
-
+		    if(strcmp(GameServer()->GameType(),"gCQ") != 0)
+                new CProjectile(GameWorld(), WEAPON_GRENADE,
+                    m_pPlayer->GetCID(),
+                    ProjStartPos,
+                    Direction,
+                    (int)(Server()->TickSpeed()*GameServer()->Tuning()->m_GrenadeLifetime),
+                    g_pData->m_Weapons.m_Grenade.m_pBase->m_Damage, true, 0, SOUND_GRENADE_EXPLODE, WEAPON_GRENADE);
+			else
+                new CProjectileGCQ(GameWorld(), WEAPON_GRENADE,
+                    m_pPlayer->GetCID(),
+                    ProjStartPos,
+                    Direction,
+                    (int)(Server()->TickSpeed()*GameServer()->Tuning()->m_GrenadeLifetime),
+                    g_pData->m_Weapons.m_Grenade.m_pBase->m_Damage, true, 0, SOUND_GRENADE_EXPLODE, WEAPON_GRENADE);
 			GameServer()->CreateSound(m_Pos, SOUND_GRENADE_FIRE);
 		} break;
 
 		case WEAPON_LASER:
 		{
-			new CLaser(GameWorld(), m_Pos, Direction, GameServer()->Tuning()->m_LaserReach, m_pPlayer->GetCID());
+		    if(strcmp(GameServer()->GameType(),"iCQ") != 0)
+                new CLaser(GameWorld(), m_Pos, Direction, GameServer()->Tuning()->m_LaserReach, m_pPlayer->GetCID());
+			else
+                new CLaserInstagib(GameWorld(), m_Pos, Direction, GameServer()->Tuning()->m_LaserReach, m_pPlayer->GetCID());
 			GameServer()->CreateSound(m_Pos, SOUND_LASER_FIRE);
 		} break;
-
 		case WEAPON_NINJA:
 		{
 			// reset Hit objects
@@ -645,6 +661,14 @@ bool CCharacter::IncreaseArmor(int Amount)
 	m_Armor = clamp(m_Armor+Amount, 0, 10);
 	return true;
 }
+/* CQ: For gCQ perhaps if ammo spam is too much and regeneration should be dependent on something outside the character */
+bool CCharacter::IncreaseAmmo(int Weapon,int Amount)
+{
+	if(m_aWeapons[Weapon].m_Ammo >= 10)
+		return false;
+	m_aWeapons[Weapon].m_Ammo = clamp(m_aWeapons[Weapon].m_Ammo+Amount, 0, 10);
+	return true;
+}
 
 void CCharacter::Die(int Killer, int Weapon)
 {
@@ -678,86 +702,88 @@ void CCharacter::Die(int Killer, int Weapon)
 	GameServer()->CreateDeath(m_Pos, m_pPlayer->GetCID());
 }
 
+void CCharacter::PutForce(vec2 Force)
+{
+	m_Core.m_Vel += Force;
+}
 bool CCharacter::TakeDamage(vec2 Force, vec2 Source, int Dmg, int From, int Weapon)
 {
 	m_Core.m_Vel += Force;
+    if(GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From))
+        return false;
 
-	if(GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From))
-		return false;
+    // m_pPlayer only inflicts half damage on self
+    if(From == m_pPlayer->GetCID())
+        Dmg = max(1, Dmg/2);
 
-	// m_pPlayer only inflicts half damage on self
-	if(From == m_pPlayer->GetCID())
-		Dmg = max(1, Dmg/2);
+    int OldHealth = m_Health, OldArmor = m_Armor;
+    if(Dmg)
+    {
+        if(m_Armor)
+        {
+            if(Dmg > 1)
+            {
+                m_Health--;
+                Dmg--;
+            }
 
-	int OldHealth = m_Health, OldArmor = m_Armor;
-	if(Dmg)
-	{
-		if(m_Armor)
-		{
-			if(Dmg > 1)
-			{
-				m_Health--;
-				Dmg--;
-			}
+            if(Dmg > m_Armor)
+            {
+                Dmg -= m_Armor;
+                m_Armor = 0;
+            }
+            else
+            {
+                m_Armor -= Dmg;
+                Dmg = 0;
+            }
+        }
 
-			if(Dmg > m_Armor)
-			{
-				Dmg -= m_Armor;
-				m_Armor = 0;
-			}
-			else
-			{
-				m_Armor -= Dmg;
-				Dmg = 0;
-			}
-		}
+        m_Health -= Dmg;
+    }
 
-		m_Health -= Dmg;
-	}
+    // create healthmod indicator
+    GameServer()->CreateDamage(m_Pos, m_pPlayer->GetCID(), Source, OldHealth-m_Health, OldArmor-m_Armor, From == m_pPlayer->GetCID());
 
-	// create healthmod indicator
-	GameServer()->CreateDamage(m_Pos, m_pPlayer->GetCID(), Source, OldHealth-m_Health, OldArmor-m_Armor, From == m_pPlayer->GetCID());
+    // do damage Hit sound
+    if(From >= 0 && From != m_pPlayer->GetCID() && GameServer()->m_apPlayers[From])
+    {
+        int64 Mask = CmaskOne(From);
+        for(int i = 0; i < MAX_CLIENTS; i++)
+        {
+            if(GameServer()->m_apPlayers[i] && (GameServer()->m_apPlayers[i]->GetTeam() == TEAM_SPECTATORS ||  GameServer()->m_apPlayers[i]->m_DeadSpecMode) &&
+                GameServer()->m_apPlayers[i]->GetSpectatorID() == From)
+                Mask |= CmaskOne(i);
+        }
+        GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, Mask);
+    }
 
-	// do damage Hit sound
-	if(From >= 0 && From != m_pPlayer->GetCID() && GameServer()->m_apPlayers[From])
-	{
-		int64 Mask = CmaskOne(From);
-		for(int i = 0; i < MAX_CLIENTS; i++)
-		{
-			if(GameServer()->m_apPlayers[i] && (GameServer()->m_apPlayers[i]->GetTeam() == TEAM_SPECTATORS ||  GameServer()->m_apPlayers[i]->m_DeadSpecMode) &&
-				GameServer()->m_apPlayers[i]->GetSpectatorID() == From)
-				Mask |= CmaskOne(i);
-		}
-		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, Mask);
-	}
+    // check for death
+    if(m_Health <= 0)
+    {
+        Die(From, Weapon);
 
-	// check for death
-	if(m_Health <= 0)
-	{
-		Die(From, Weapon);
+        // set attacker's face to happy (taunt!)
+        if (From >= 0 && From != m_pPlayer->GetCID() && GameServer()->m_apPlayers[From])
+        {
+            CCharacter *pChr = GameServer()->m_apPlayers[From]->GetCharacter();
+            if (pChr)
+            {
+                pChr->m_EmoteType = EMOTE_HAPPY;
+                pChr->m_EmoteStop = Server()->Tick() + Server()->TickSpeed();
+            }
+        }
 
-		// set attacker's face to happy (taunt!)
-		if (From >= 0 && From != m_pPlayer->GetCID() && GameServer()->m_apPlayers[From])
-		{
-			CCharacter *pChr = GameServer()->m_apPlayers[From]->GetCharacter();
-			if (pChr)
-			{
-				pChr->m_EmoteType = EMOTE_HAPPY;
-				pChr->m_EmoteStop = Server()->Tick() + Server()->TickSpeed();
-			}
-		}
+        return false;
+    }
 
-		return false;
-	}
+    if (Dmg > 2)
+        GameServer()->CreateSound(m_Pos, SOUND_PLAYER_PAIN_LONG);
+    else
+        GameServer()->CreateSound(m_Pos, SOUND_PLAYER_PAIN_SHORT);
 
-	if (Dmg > 2)
-		GameServer()->CreateSound(m_Pos, SOUND_PLAYER_PAIN_LONG);
-	else
-		GameServer()->CreateSound(m_Pos, SOUND_PLAYER_PAIN_SHORT);
-
-	m_EmoteType = EMOTE_PAIN;
-	m_EmoteStop = Server()->Tick() + 500 * Server()->TickSpeed() / 1000;
-
+    m_EmoteType = EMOTE_PAIN;
+    m_EmoteStop = Server()->Tick() + 500 * Server()->TickSpeed() / 1000;
 	return true;
 }
 

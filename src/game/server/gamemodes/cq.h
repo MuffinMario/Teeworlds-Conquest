@@ -8,13 +8,15 @@
 #include <vector>
 #include <array>
 
-#define CQ_VERSION "0.2.0"
+#define CQ_VERSION "0.2.1"
 
 // you can subclass GAMECONTROLLER_CTF, GAMECONTROLLER_TDM etc if you want
 // todo a modification with their base as well.
 class CGameControllerCQ : public IGameController
 {
     std::vector<CCapture*> m_aCapturePoints;
+protected:
+	virtual bool OnEntityCQ(int Index,vec2 Pos);
 public:
     static const constexpr std::array<int,6> m_sRadiiEntities = {
         100,150,200,250,350,450
@@ -25,6 +27,7 @@ public:
 	virtual bool OnChatCommand(int ClientID,const char* pCommand,const char* pParam);
 	virtual void Reset();
 	virtual bool OnEntity(int Index, vec2 Pos);
+	virtual int OnCharacterDeath(CCharacter* pVictim,CPlayer* pKiller, int Weapon);
 	// add more virtual functions here if you wish
 };
 #endif
